@@ -4,7 +4,7 @@ replicaCount: 1
 image:
   repository: 591834595020.dkr.ecr.us-east-1.amazonaws.com/idp-test-app-prod
   pullPolicy: Always
-  tag: "v19-132bfad"
+  tag: "v21-e014b48"
 service:
   type: ClusterIP
   port: 80
