@@ -1,0 +1,38 @@
+awsSecretsCSI:
+  enabled: false
+fullnameOverride: idp-test-app-prod
+healthCheck:
+  path: /healthz
+  port: 8000
+image:
+  pullPolicy: Always
+  repository: 591834595020.dkr.ecr.us-east-1.amazonaws.com/idp-test-app-prod
+  tag: latest
+ingress:
+  enabled: true
+  hosts:
+  - host: idp-test-app.ultrahuman.com
+    paths:
+    - path: /
+      pathType: Prefix
+  ingressClassName: nginx
+nameOverride: idp-test-app-prod
+nodeSelector:
+  kubernetes.io/arch: arm64
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+service:
+  port: 80
+  targetPort: 8000
+  type: ClusterIP
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::591834595020:role/idp-test-app-prod
+  create: true
+  name: idp-test-app-prod
