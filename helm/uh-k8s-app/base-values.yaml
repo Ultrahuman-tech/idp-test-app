@@ -1,3 +1,7 @@
+initImages:
+  yq: "591834595020.dkr.ecr.us-east-1.amazonaws.com/yq:latest"
+  kubectl: "591834595020.dkr.ecr.us-east-1.amazonaws.com/kubectl:latest"
+
 # Default values for demo-app
 # Optimized for EKS 1.33+ with internal services via nginx-ingress
 
