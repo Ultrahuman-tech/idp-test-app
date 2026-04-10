@@ -1,0 +1,68 @@
+nameOverride: "idp-test-app-staging"
+fullnameOverride: "idp-test-app-staging"
+
+replicaCount: 1
+
+image:
+  repository: 074953058938.dkr.ecr.us-east-1.amazonaws.com/idp-test-app-staging
+  pullPolicy: Always
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  ingressClassName: ingress-nginx-stage
+  hosts:
+    - host: idp-test-app.staging.ultrahuman.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+serviceAccount:
+  create: true
+  name: "idp-test-app-staging"
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::074953058938:role/idp-test-app-staging"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector:
+  kubernetes.io/arch: arm64
+
+tolerations:
+  - key: arch
+    operator: Equal
+    value: arm64
+    effect: NoSchedule
+healthCheck:
+  path: /healthz
+  port: 8000
+
+env:
+  - name: PORT
+    value: "8000"
+  - name: ENVIRONMENT
+    value: "staging"
+  - name: APP_NAME
+    value: "idp-test-app"
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+awsSecretsCSI:
+  enabled: false
+
