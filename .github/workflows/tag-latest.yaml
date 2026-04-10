@@ -1,0 +1,13 @@
+name: Tag Latest on Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag-latest:
+    uses: Ultrahuman-tech/uh-cicd/.github/workflows/tag-latest.yaml@main
+    with:
+      app_name: idp-test-app
+    secrets: inherit
