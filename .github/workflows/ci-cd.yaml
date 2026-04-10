@@ -1,0 +1,151 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - release
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: idp-test-app
+  VALUES_FILE: helm/uh-k8s-app/values-idp-test-app.yaml
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on:
+      - idp-test-app-${{ github.ref == 'refs/heads/release' && 'prod' || 'staging' }}-runner
+    if: |
+      github.actor != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, 'update image tag to')
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    outputs:
+      image_tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set environment variables
+        id: set_env
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/release" ]; then
+            ACCT="591834595020"; ENV="prod"
+          else
+            ACCT="074953058938"; ENV="staging"
+          fi
+          echo "RESOURCE_NAME=${{ env.APP_NAME }}-${ENV}" >> $GITHUB_OUTPUT
+          echo "REGISTRY=${ACCT}.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
+          echo "IMAGE_NAME=${ACCT}.dkr.ecr.us-east-1.amazonaws.com/${{ env.APP_NAME }}-${ENV}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        env:
+          DOCKER_API_VERSION: "1.43"
+        with:
+          driver: docker-container
+          driver-opts: image=moby/buildkit:v0.12.0
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | \
+          docker login --username AWS --password-stdin "${{ steps.set_env.outputs.REGISTRY }}"
+
+      - name: Generate version tag
+        id: version
+        run: |
+          VERSION_TAG="v$(git rev-list --count HEAD)-$(echo ${{ github.sha }} | cut -c1-7)"
+          echo "tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.set_env.outputs.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.tag }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        env:
+          DOCKER_API_VERSION: "1.43"
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  update-helm-values:
+    name: Update Helm Values
+    needs: build-and-push
+    runs-on:
+      - idp-test-app-${{ github.ref == 'refs/heads/release' && 'prod' || 'staging' }}-runner
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install yq
+        run: |
+          ARCH=$(uname -m)
+          [[ "$ARCH" = "aarch64" || "$ARCH" = "arm64" ]] && YQ="yq_linux_arm64" || YQ="yq_linux_amd64"
+          sudo wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/${YQ}"
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update image tag on CI branch
+        run: |
+          NEW_TAG="${{ needs.build-and-push.outputs.image_tag }}"
+          yq eval ".image.tag = \"${NEW_TAG}\"" -i "${{ env.VALUES_FILE }}"
+          git add "${{ env.VALUES_FILE }}"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(${{ env.APP_NAME }}): update image tag to ${NEW_TAG}"
+            git push origin "${{ github.ref_name }}"
+          fi
+
+      - name: Update image tag on ArgoCD branch
+        run: |
+          NEW_TAG="${{ needs.build-and-push.outputs.image_tag }}"
+          if [ "${{ github.ref_name }}" = "release" ]; then
+            ARGOCD_BRANCH="k8s-main"
+          else
+            ARGOCD_BRANCH="k8s-staging"
+          fi
+          git fetch origin "$ARGOCD_BRANCH" 2>/dev/null || exit 0
+          git checkout "$ARGOCD_BRANCH"
+          git pull origin "$ARGOCD_BRANCH" 2>/dev/null || true
+          if [ -f "${{ env.VALUES_FILE }}" ]; then
+            yq eval ".image.tag = \"${NEW_TAG}\"" -i "${{ env.VALUES_FILE }}"
+            git add "${{ env.VALUES_FILE }}"
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(${{ env.APP_NAME }}): update image tag to ${NEW_TAG} [argocd]"
+              git push origin "$ARGOCD_BRANCH"
+            fi
+          fi
