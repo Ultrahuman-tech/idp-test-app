@@ -1,0 +1,33 @@
+fullnameOverride: idp-test-app-staging
+healthCheck:
+  path: /healthz
+  port: 8000
+image:
+  pullPolicy: Always
+  repository: 074953058938.dkr.ecr.us-east-1.amazonaws.com/idp-test-app-staging
+  tag: latest
+ingress:
+  enabled: true
+  hosts:
+  - host: idp-test-app.staging.ultrahuman.com
+    paths:
+    - path: /
+      pathType: Prefix
+nameOverride: idp-test-app-staging
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+service:
+  port: 80
+  targetPort: 8000
+  type: ClusterIP
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::074953058938:role/idp-test-app-staging
+  create: true
+  name: idp-test-app-staging
