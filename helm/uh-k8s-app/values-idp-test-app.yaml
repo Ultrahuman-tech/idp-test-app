@@ -1,0 +1,68 @@
+nameOverride: "idp-test-app-prod"
+fullnameOverride: "idp-test-app-prod"
+
+replicaCount: 1
+
+image:
+  repository: 591834595020.dkr.ecr.us-east-1.amazonaws.com/idp-test-app-prod
+  pullPolicy: Always
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  ingressClassName: ingress-nginx-prod
+  hosts:
+    - host: idp-test-app.ultrahuman.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+serviceAccount:
+  create: true
+  name: "idp-test-app-prod"
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::591834595020:role/idp-test-app-prod"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector:
+  kubernetes.io/arch: arm64
+
+tolerations:
+  - key: arch
+    operator: Equal
+    value: arm64
+    effect: NoSchedule
+healthCheck:
+  path: /healthz
+  port: 8000
+
+env:
+  - name: PORT
+    value: "8000"
+  - name: ENVIRONMENT
+    value: "prod"
+  - name: APP_NAME
+    value: "idp-test-app"
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+awsSecretsCSI:
+  enabled: false
+
