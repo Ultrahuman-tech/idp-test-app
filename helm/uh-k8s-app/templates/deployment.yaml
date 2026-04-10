@@ -82,8 +82,7 @@ spec:
             # Detect format: JSON {"KEY":"VALUE",...} or plain text KEY=VALUE
             if head -c 1 "$ENV_FILE" | grep -q '{'; then
               echo "Detected JSON format - converting to KEY=VALUE..."
-              awk -F'"' '{for(i=2;i<NF;i+=4) printf "%s=%s
-",$i,$(i+2)}' "$ENV_FILE" > /tmp/env-file
+              awk -F'"' '{for(i=2;i<NF;i+=4) printf "%s=%s\n",$i,$(i+2)}' "$ENV_FILE" > /tmp/env-file
               ENV_FILE="/tmp/env-file"
             fi
 
