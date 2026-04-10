@@ -1,5 +1,3 @@
-awsSecretsCSI:
-  enabled: false
 fullnameOverride: idp-test-app-prod
 healthCheck:
   path: /healthz
@@ -15,7 +13,6 @@ ingress:
     paths:
     - path: /
       pathType: Prefix
-  ingressClassName: nginx
 nameOverride: idp-test-app-prod
 nodeSelector:
   kubernetes.io/arch: arm64
