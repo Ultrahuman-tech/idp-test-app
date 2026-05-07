@@ -1,0 +1,44 @@
+# A deliberately minimal app spec used to exercise the IDP end-to-end via the
+# uh-idp-bot Slack flow. Matches the existing FastAPI hello-world in this repo
+# (port 8000, /healthz). The `_meta` block is honest — no real risks here.
+#
+# Auto-approve path: staging + small + 0 risks + all preflight=true. Drop any
+# of those and the bot will hold for a manual @devops review.
+
+version: "2"
+app: idp-test-app
+team: devops
+
+infra:
+  type: ec2
+  access: internal
+  environment: staging
+
+service:
+  port: 8000
+  health: /healthz
+  dockerfile: ./Dockerfile
+
+resources:
+  preset: small
+  replicas: 1
+  storage_gb: 20
+
+addons:
+  rds: false
+  redis: false
+  dns: true
+  jenkins: false
+
+git:
+  repo: github.com/Ultrahuman-tech/idp-test-app
+  branch: main
+
+_meta:
+  generated_by: hand-written test fixture for IDP smoke testing
+  preflight:
+    dockerfile_builds: true
+    health_endpoint_responds: true
+    no_hardcoded_secrets: true
+  risks: []
+  open_questions: []
